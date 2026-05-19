@@ -776,16 +776,16 @@
     -fx-cursor: hand;
 }
 .carousel-side {
-    -fx-font-size: 9px;
+    -fx-font-size: 10px;
     -fx-font-weight: 600;
-    -fx-text-fill: #5A5C66;
-    -fx-opacity: 0.35;
+    -fx-text-fill: #B0B5BF;
+    -fx-opacity: 0.70;
     -fx-cursor: hand;
-    -fx-padding: 0;
+    -fx-padding: 0 4;
 }
-.carousel-side:hover { -fx-opacity: 0.85; -fx-text-fill: derive(-accent, 18%); }
-.light .carousel-side { -fx-text-fill: #7A7A7E; }
-.light .carousel-side:hover { -fx-text-fill: -accent; }
+.carousel-side:hover { -fx-opacity: 1.0; -fx-text-fill: derive(-accent, 18%); }
+.light .carousel-side { -fx-text-fill: #4A4A4E; -fx-opacity: 0.75; }
+.light .carousel-side:hover { -fx-text-fill: -accent; -fx-opacity: 1.0; }
 .light .tab-description {
     -fx-text-fill: #3A3A3D;
     -fx-background-color: #F5F5F8;

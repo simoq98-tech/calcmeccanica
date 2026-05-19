@@ -102,21 +102,29 @@ public class Toolkit {
 
     // ====================== Sezioni carousel ======================
     private HBox buildCarousel() {
-        HBox c = new HBox(4);
-        c.setAlignment(Pos.CENTER);
-        c.getStyleClass().add("toolkit-carousel");
         for (int i = 0; i < 3; i++) {
             Label l = new Label("");
             carouselLabels[i] = l;
             l.getStyleClass().add(i == 1 ? "carousel-center" : "carousel-side");
-            final int delta = i - 1; // -1 left, 0 center, +1 right
+            final int delta = i - 1;
             l.setOnMouseClicked(e -> {
                 if (delta == 0) return;
                 int target = delta > 0 ? nextSezIdx() : prevSezIdx();
                 goToSezioni(target, delta);
             });
-            c.getChildren().add(l);
         }
+        // Equal-width side wrappers so the center label sits at the geometric center
+        HBox leftWrap = new HBox(carouselLabels[0]);
+        leftWrap.setAlignment(Pos.CENTER_RIGHT);
+        leftWrap.setMinWidth(100); leftWrap.setMaxWidth(100); leftWrap.setPrefWidth(100);
+
+        HBox rightWrap = new HBox(carouselLabels[2]);
+        rightWrap.setAlignment(Pos.CENTER_LEFT);
+        rightWrap.setMinWidth(100); rightWrap.setMaxWidth(100); rightWrap.setPrefWidth(100);
+
+        HBox c = new HBox(2, leftWrap, carouselLabels[1], rightWrap);
+        c.setAlignment(Pos.CENTER);
+        c.getStyleClass().add("toolkit-carousel");
         return c;
     }
 
@@ -1589,30 +1597,59 @@ public class Toolkit {
     // --- Pipes ---
     private VBox buildPipesPanel() {
         Label desc = description(
-            "Tubi commerciali ASME B36.10 (DN15 → DN300, schedule 40 e 80). Restituisce "
-            + "diametro esterno OD, spessore, diametro interno ID, peso al metro, volume "
-            + "interno L/m e designazione NPS (Nominal Pipe Size).");
+            "Tubi commerciali ASME B36.10 — NPS da 1/8\" a 24\", schedule 5/10/20/30/40/60/80/100/120/140/160 "
+            + "+ XXS (dove disponibili). Selezione DN/pollici + schedule → OD, spessore, ID, peso al metro, "
+            + "volume interno L/m. Il peso usa la densità del materiale scelto in alto (default acciaio "
+            + "ρ=7850). Inserisci la lunghezza in metri per il peso totale del tronchetto.");
         ComboBox<String> dnCombo = new ComboBox<>();
         ComboBox<String> schCombo = new ComboBox<>();
         List<String> dns = new ArrayList<>();
-        List<String> schs = new ArrayList<>();
         for (Catalog.Pipe p : Catalog.PIPES) {
             if (!dns.contains(p.dn())) dns.add(p.dn());
-            if (!schs.contains(p.sch())) schs.add(p.sch());
         }
         dnCombo.getItems().addAll(dns);
-        schCombo.getItems().addAll(schs);
         dnCombo.setMaxWidth(Double.MAX_VALUE);
         schCombo.setMaxWidth(Double.MAX_VALUE);
+
+        // Length input for total weight
+        TextField lenField = numField();
+        lenField.setText("1.0");
+        lenField.setPromptText("Lunghezza tubo [m]");
+
+        // Show DN with inch label for clarity
+        dnCombo.setConverter(new StringConverter<>() {
+            @Override public String toString(String dn) {
+                if (dn == null) return "";
+                Catalog.Pipe sample = Catalog.PIPES.stream().filter(p -> p.dn().equals(dn)).findFirst().orElse(null);
+                return sample == null ? dn : dn + "  ·  NPS " + sample.nps() + "  ·  OD " + fmt(sample.od()) + " mm";
+            }
+            @Override public String fromString(String s) { return s; }
+        });
 
         GridPane out = new GridPane();
         out.setHgap(6); out.setVgap(4);
         out.getStyleClass().add("toolkit-table");
         for (int c = 0; c < 3; c++) {
             ColumnConstraints cc = new ColumnConstraints();
-            cc.setPercentWidth(c == 0 ? 28 : c == 1 ? 42 : 30);
+            cc.setPercentWidth(c == 0 ? 30 : c == 1 ? 45 : 25);
             out.getColumnConstraints().add(cc);
         }
+
+        Runnable updateSched = () -> {
+            String dn = dnCombo.getValue();
+            schCombo.getItems().clear();
+            if (dn == null) return;
+            Catalog.PIPES.stream()
+                .filter(p -> p.dn().equals(dn))
+                .map(Catalog.Pipe::sch)
+                .distinct()
+                .forEach(schCombo.getItems()::add);
+            if (!schCombo.getItems().isEmpty()) {
+                // prefer Sch 40 if present, else first
+                String pref = schCombo.getItems().contains("Sch 40") ? "Sch 40" : schCombo.getItems().get(0);
+                schCombo.setValue(pref);
+            }
+        };
 
         Runnable update = () -> {
             out.getChildren().clear();
@@ -1626,26 +1663,47 @@ public class Toolkit {
                 out.add(new Label("Combinazione non disponibile"), 0, 0, 3, 1);
                 return;
             }
+            // Compute weight with current material (defaults to steel rho=7850 from catalog)
+            Catalog.Material mat = sectionMaterial.get();
+            double rho = mat != null ? mat.rho() : 7850.0;
+            double areaMm2 = Math.PI / 4 * (p.od() * p.od() - p.id() * p.id());
+            double kgPerM  = areaMm2 * 1e-6 * rho;
             int r = 0;
-            addPropertyRow(out, r++, "OD",   fmt(p.od())     + " mm",   "OD",       p.od());
-            addPropertyRow(out, r++, "sp.",  fmt(p.wall())   + " mm",   "thk",      p.wall());
-            addPropertyRow(out, r++, "ID",   fmt(p.id())     + " mm",   "ID",       p.id());
-            addPropertyRow(out, r++, "peso", fmt(p.weight()) + " kg/m", "kg_per_m", p.weight());
-            addPropertyRow(out, r++, "vol",  fmt(p.volPerM())+ " L/m",  "L_per_m",  p.volPerM());
+            addPropertyRow(out, r++, "OD",     fmt(p.od())   + " mm",   "OD",       p.od());
+            addPropertyRow(out, r++, "sp.",    fmt(p.wall()) + " mm",   "thk",      p.wall());
+            addPropertyRow(out, r++, "ID",     fmt(p.id())   + " mm",   "ID",       p.id());
+            addPropertyRow(out, r++, "A sez",  fmt(areaMm2)  + " mm²",  "A_sez",    areaMm2);
+            addPropertyRow(out, r++, "vol",    fmt(p.volPerM()) + " L/m", "L_per_m", p.volPerM());
+            String matLbl = mat == null ? "acciaio" : mat.name();
+            addPropertyRow(out, r++, "kg/m (" + matLbl + ")", fmt(kgPerM) + " kg/m", "kg_per_m", kgPerM);
+            // Total weight from length
+            double L;
+            try { L = Double.parseDouble(lenField.getText().replace(",", ".").trim()); }
+            catch (Exception e) { L = Double.NaN; }
+            if (Double.isFinite(L) && L > 0) {
+                double tot = kgPerM * L;
+                addPropertyRow(out, r++, "peso tot", fmt(tot) + " kg (L=" + fmt(L) + " m)", "peso_tot", tot);
+            }
             Label npsLbl = new Label("NPS");  npsLbl.getStyleClass().add("toolkit-key");
             Label npsVal = new Label(p.nps()); npsVal.getStyleClass().add("toolkit-val");
             out.add(npsLbl, 0, r);
             out.add(npsVal, 1, r, 2, 1);
         };
-        dnCombo.valueProperty().addListener((o, ov, nv) -> update.run());
+        dnCombo.valueProperty().addListener((o, ov, nv) -> { updateSched.run(); update.run(); });
         schCombo.valueProperty().addListener((o, ov, nv) -> update.run());
-        dnCombo.getSelectionModel().select(0);
-        schCombo.getSelectionModel().select(0);
+        lenField.textProperty().addListener((o, ov, nv) -> update.run());
+        sectionMaterial.addListener((o, ov, nv) -> update.run());
+
+        // Initialize: select DN50 (2") if present, otherwise first
+        int initial = dns.indexOf("DN50");
+        if (initial < 0) initial = 0;
+        dnCombo.getSelectionModel().select(initial);
 
         return new VBox(6,
             desc,
-            label("DN:"), dnCombo,
+            label("DN  ·  NPS  ·  OD:"), dnCombo,
             label("Schedule:"), schCombo,
+            label("Lunghezza [m] (per peso totale):"), lenField,
             label("Dati:"), out
         );
     }
