@@ -1,0 +1,40 @@
+# --- Java / Maven ---
+target/
+*.class
+*.jar
+*.war
+*.ear
+.classpath
+.project
+.settings/
+.factorypath
+hs_err_pid*
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+.metadata/
+nbproject/
+build/
+
+# --- jpackage / jlink outputs ---
+dist/
+calc-runtime/
+*.exe
+*.msi
+
+# --- PWA / web build ---
+node_modules/
+dist/
+*.zip
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs / locals ---
+*.log
+.env
+.env.local

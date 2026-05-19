@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Body -->
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="#FF7043"/>
+  <!-- Inner bezel -->
+  <rect x="16" y="16" width="224" height="224" rx="46" fill="none" stroke="rgba(0,0,0,0.10)" stroke-width="2"/>
+  <!-- Display -->
+  <rect x="41" y="36" width="174" height="56" rx="12" fill="#F8F8FA"/>
+  <!-- 6 buttons (2 rows × 3 cols) -->
+  <g fill="#FFFFFF" opacity="0.90">
+    <rect x="48"  y="118" width="48" height="40" rx="10"/>
+    <rect x="104" y="118" width="48" height="40" rx="10"/>
+    <rect x="160" y="118" width="48" height="40" rx="10"/>
+    <rect x="48"  y="166" width="48" height="40" rx="10"/>
+    <rect x="104" y="166" width="48" height="40" rx="10"/>
+  </g>
+  <!-- = button (dark, prominent) -->
+  <rect x="160" y="166" width="48" height="40" rx="10" fill="#1A1A21" opacity="0.92"/>
+</svg>

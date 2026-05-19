@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#15161A" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Calc" />
+  <title>Calc Meccanica</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header / toolbar -->
+    <header class="toolbar">
+      <button class="chip icon" id="menuBtn" aria-label="Menu">☰</button>
+      <button class="chip" id="degRadBtn">DEG</button>
+      <button class="chip" id="secondBtn">2nd</button>
+      <button class="chip icon" id="memBtn" aria-label="Memoria">💾</button>
+      <span class="spacer"></span>
+      <button class="chip icon" id="pinBtn" aria-label="Sempre visibile">📌</button>
+    </header>
+
+    <!-- Display -->
+    <section class="display">
+      <div class="indicators" id="indicators">SCIENTIFICA  DEG</div>
+      <div class="expr" id="expr"></div>
+      <div class="result" id="result">0</div>
+    </section>
+
+    <!-- Memory reveal panel (slots) -->
+    <div class="mem-reveal" id="memReveal" hidden>
+      <div class="mem-op-hint" id="memOpHint" hidden></div>
+      <div class="slots-row">
+        <button class="slot-btn" data-slot="0">
+          <span class="slot-idx">M1</span><span class="slot-val">—</span>
+        </button>
+        <button class="slot-btn" data-slot="1">
+          <span class="slot-idx">M2</span><span class="slot-val">—</span>
+        </button>
+        <button class="slot-btn" data-slot="2">
+          <span class="slot-idx">M3</span><span class="slot-val">—</span>
+        </button>
+        <button class="slot-btn" data-slot="3">
+          <span class="slot-idx">M4</span><span class="slot-val">—</span>
+        </button>
+        <button class="slot-btn" data-slot="4">
+          <span class="slot-idx">M5</span><span class="slot-val">—</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Memory commands row -->
+    <div class="mem-cmds">
+      <button class="btn mem" data-key="MC" title="Cancella memoria">MC</button>
+      <button class="btn mem" data-key="MR" title="Inserisci memoria">MR</button>
+      <button class="btn mem" data-key="M+" title="Aggiungi a memoria">M+</button>
+      <button class="btn mem" data-key="M−" title="Sottrai da memoria">M−</button>
+    </div>
+
+    <!-- Date view -->
+    <div class="view-content" id="dateView" hidden>
+      <div class="menu-section">DIFFERENZA TRA DATE</div>
+      <label class="radio-row">Dal: <input class="toolkit-input" type="date" id="dateFrom" /></label>
+      <label class="radio-row">Al: <input class="toolkit-input" type="date" id="dateTo" /></label>
+      <div class="tk-result" id="dateDiff">—</div>
+
+      <div class="menu-section">AGGIUNGI / SOTTRAI GIORNI</div>
+      <label class="radio-row">Data: <input class="toolkit-input" type="date" id="dateBase" /></label>
+      <label class="radio-row">Giorni (+/−): <input class="toolkit-input" type="number" id="dateDelta" value="30" /></label>
+      <div class="tk-result" id="dateResult">—</div>
+    </div>
+
+    <!-- Graphing view -->
+    <div class="view-content" id="graphView" hidden>
+      <div class="graph-toolbar">
+        <span class="tk-key">y =</span>
+        <input class="toolkit-input" id="graphFn" value="sin(x)" placeholder="es. sin(x), x^2-4" />
+      </div>
+      <div class="graph-toolbar">
+        <span class="tk-key">x:</span>
+        <input class="toolkit-input" id="graphMin" value="-10" inputmode="decimal" style="max-width:80px" />
+        <span class="tk-key">→</span>
+        <input class="toolkit-input" id="graphMax" value="10" inputmode="decimal" style="max-width:80px" />
+        <button class="chip" id="graphPlot">Plotta</button>
+      </div>
+      <canvas id="graphCanvas" class="graph-canvas"></canvas>
+    </div>
+
+    <!-- Calculator grid (Scientific/Programmer) -->
+    <div class="grid" id="grid">
+      <button class="btn fn" data-key="sin" data-flip="asin">sin</button>
+      <button class="btn fn" data-key="cos" data-flip="acos">cos</button>
+      <button class="btn fn" data-key="tan" data-flip="atan">tan</button>
+      <button class="btn fn" data-key="π">π</button>
+
+      <button class="btn fn" data-key="ln">ln</button>
+      <button class="btn fn" data-key="log">log</button>
+      <button class="btn fn" data-key="√">√</button>
+      <button class="btn fn" data-key="e">e</button>
+
+      <button class="btn fn" data-key="(">(</button>
+      <button class="btn fn" data-key=")">)</button>
+      <button class="btn fn" data-key="^">^</button>
+      <button class="btn fn" data-key="!">!</button>
+
+      <button class="btn clear" data-key="AC">AC</button>
+      <button class="btn clear" data-key="⌫">⌫</button>
+      <button class="btn ans" data-key="Ans">Ans</button>
+      <button class="btn op" data-key="÷">÷</button>
+
+      <button class="btn digit" data-key="7">7</button>
+      <button class="btn digit" data-key="8">8</button>
+      <button class="btn digit" data-key="9">9</button>
+      <button class="btn op" data-key="×">×</button>
+
+      <button class="btn digit" data-key="4">4</button>
+      <button class="btn digit" data-key="5">5</button>
+      <button class="btn digit" data-key="6">6</button>
+      <button class="btn op" data-key="−">−</button>
+
+      <button class="btn digit" data-key="1">1</button>
+      <button class="btn digit" data-key="2">2</button>
+      <button class="btn digit" data-key="3">3</button>
+      <button class="btn op" data-key="+">+</button>
+
+      <button class="btn digit" data-key="±">±</button>
+      <button class="btn digit" data-key="0">0</button>
+      <button class="btn digit" data-key=".">.</button>
+      <button class="btn eq" data-key="=">=</button>
+    </div>
+  </div>
+
+  <!-- ========== Overlays ========== -->
+
+  <!-- Menu drawer -->
+  <div class="overlay" id="menuOverlay" hidden>
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>Menu</h2>
+        <button class="chip icon close-btn" data-close="menuOverlay">✕</button>
+      </div>
+      <div class="overlay-body">
+        <div class="menu-section">MODALITÀ</div>
+        <button class="menu-row mode-row" data-mode="SCIENTIFIC">Scientifica</button>
+        <button class="menu-row mode-row" data-mode="PROGRAMMER">Programmatore</button>
+        <button class="menu-row mode-row" data-mode="DATE">Calcolo date</button>
+        <button class="menu-row mode-row" data-mode="GRAPHING">Grafici</button>
+        <div class="menu-section">STRUMENTI</div>
+        <button class="menu-row" data-action="open-toolkit-units">Conversioni unità</button>
+        <button class="menu-row" data-action="open-toolkit-materials">Materiali</button>
+        <button class="menu-row" data-action="open-toolkit-sections">Sezioni &amp; Profili</button>
+        <button class="menu-row" data-action="open-toolkit-formulas">Formulario</button>
+        <button class="menu-row" data-action="open-toolkit-wizards">Procedure (Bulloni, Saldature, Stat, Tempo)</button>
+        <button class="menu-row" data-action="open-toolkit-more">Triangoli, Vettori, Solver, Tubi</button>
+        <div class="menu-section">DATI</div>
+        <button class="menu-row" data-action="open-history">Storico calcoli</button>
+        <button class="menu-row" data-action="open-variables">Variabili</button>
+        <div class="menu-section">SISTEMA</div>
+        <button class="menu-row" data-action="open-settings">Impostazioni</button>
+        <button class="menu-row" data-action="open-about">About / Scorciatoie</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="overlay" id="historyOverlay" hidden>
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>Storico</h2>
+        <button class="chip" id="historyClear">Pulisci</button>
+        <button class="chip icon close-btn" data-close="historyOverlay">✕</button>
+      </div>
+      <div class="overlay-body">
+        <ul class="history-list" id="historyList">
+          <li class="placeholder">— nessun calcolo ancora —</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Variables -->
+  <div class="overlay" id="variablesOverlay" hidden>
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>Variabili</h2>
+        <button class="chip icon close-btn" data-close="variablesOverlay">✕</button>
+      </div>
+      <div class="overlay-body">
+        <table class="var-table" id="varTable">
+          <thead><tr><th>Nome</th><th>Valore</th><th></th></tr></thead>
+          <tbody id="varTbody"></tbody>
+        </table>
+        <div class="var-add-row">
+          <input class="toolkit-input" id="varNameInput" placeholder="nome (es. F, sigma)" />
+          <input class="toolkit-input" id="varValueInput" placeholder="valore" inputmode="decimal" />
+          <button class="chip" id="varAddBtn">Aggiungi</button>
+        </div>
+        <p class="toolkit-hint">Usa il nome direttamente nelle espressioni, es: <code>F*L/(48*E*I)</code></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="overlay" id="settingsOverlay" hidden>
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>Impostazioni</h2>
+        <button class="chip icon close-btn" data-close="settingsOverlay">✕</button>
+      </div>
+      <div class="overlay-body">
+        <div class="menu-section">COLORE PRINCIPALE</div>
+        <input type="color" id="accentColor" value="#FF7043" />
+        <button class="chip" id="accentReset">Ripristina corallo</button>
+
+        <div class="menu-section">NOTAZIONE NUMERICA</div>
+        <label class="radio-row"><input type="radio" name="notation" value="AUTO" checked /> Automatica</label>
+        <label class="radio-row"><input type="radio" name="notation" value="SCIENTIFIC" /> Scientifica (1.5e+06)</label>
+        <label class="radio-row"><input type="radio" name="notation" value="ENGINEERING" /> Ingegneristica (1.5 × 10⁶)</label>
+
+        <div class="menu-section">CIFRE SIGNIFICATIVE</div>
+        <label class="slider-row">
+          <span id="decimalsLabel">Cifre: 6</span>
+          <input type="range" id="decimalsRange" min="2" max="12" value="6" />
+        </label>
+
+        <div class="menu-section">TEMA</div>
+        <label class="radio-row"><input type="checkbox" id="autoTheme" /> Segui automaticamente il tema di sistema</label>
+        <label class="radio-row"><input type="radio" name="theme" value="dark" checked /> Scuro</label>
+        <label class="radio-row"><input type="radio" name="theme" value="light" /> Chiaro</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div class="overlay" id="aboutOverlay" hidden>
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>About</h2>
+        <button class="chip icon close-btn" data-close="aboutOverlay">✕</button>
+      </div>
+      <div class="overlay-body">
+        <p>Calc Meccanica — versione PWA per iPhone / Android / web.</p>
+        <div class="menu-section">SUGGERIMENTI</div>
+        <ul class="hint-list">
+          <li>Tap su slot vuoto = salva risultato</li>
+          <li>Tap su slot pieno = inserisci nel calcolo</li>
+          <li>Tap a lungo su slot = menu (Cancella)</li>
+          <li>MC/MR/M+/M− chiedono prima quale slot</li>
+          <li>Da Safari iOS: tap Condividi → Aggiungi a Home per installarla</li>
+        </ul>
+        <p class="toolkit-hint">v0.5 PWA — stesso parser/persistenza della desktop.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="parser.js"></script>
+  <script src="progparser.js"></script>
+  <script src="catalog.js"></script>
+  <script src="toolkit.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
