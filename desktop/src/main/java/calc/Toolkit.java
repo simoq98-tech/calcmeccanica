@@ -104,6 +104,12 @@ public class Toolkit {
         VBox box = new VBox(10);
         box.setPadding(new Insets(12, 4, 12, 4));
 
+        box.getChildren().add(description(
+            "Converti tra 14 categorie di unità (lunghezza, massa, forza, pressione, "
+            + "coppia, energia, potenza, velocità, area, volume, angolo, frequenza, "
+            + "densità e temperatura con offset). Scegli categoria → unità sorgente → "
+            + "valore → unità destinazione. Click 'Inserisci' per copiare il risultato nel calcolatore."));
+
         ComboBox<Catalog.UnitCategory> catCombo = new ComboBox<>(FXCollections.observableArrayList(Catalog.CATEGORIES));
         catCombo.setConverter(new StringConverter<>() {
             @Override public String toString(Catalog.UnitCategory c) { return c == null ? "" : c.name(); }
@@ -182,6 +188,12 @@ public class Toolkit {
     private Tab buildMaterialsTab() {
         VBox box = new VBox(10);
         box.setPadding(new Insets(12, 4, 12, 4));
+
+        box.getChildren().add(description(
+            "16 materiali ingegneristici con proprietà fisiche: densità ρ, moduli elastici E e G, "
+            + "coefficiente di Poisson ν, snervamento σy, rottura σt, dilatazione termica α. "
+            + "Click 'Carica tutte' importa le 7 grandezze come variabili (ro, E, G, nu, sy, su, alpha) "
+            + "richiamabili direttamente nelle formule del calcolatore."));
 
         TextField search = new TextField();
         search.setPromptText("Cerca materiale… (es. acciaio, 316, Al)");
@@ -277,9 +289,26 @@ public class Toolkit {
     }
 
     // ====================== SECTIONS ======================
+    /** mm | cm | m — used as state for both parametric and commercial section displays. */
+    private final javafx.beans.property.StringProperty sectionUnit =
+        new javafx.beans.property.SimpleStringProperty("mm");
+
     private Tab buildSectionsTab() {
         VBox box = new VBox(10);
         box.setPadding(new Insets(12, 4, 12, 4));
+
+        box.getChildren().add(description(
+            "Proprietà geometriche di sezioni (area A, momenti d'inerzia Ix/Iy, moduli "
+            + "di resistenza Wx/Wy, raggi di girazione ix/iy, perimetro). Disponibili forme "
+            + "parametriche (rettangolo, rettangolo cavo, cerchio, tubo) e profili commerciali "
+            + "(IPE, HEA, HEB, UPN). Cambia l'unità per il display: i valori si riscalano "
+            + "automaticamente."));
+
+        // Linear-unit selector (drives the display unit for all results in this tab)
+        ComboBox<String> unitCombo = new ComboBox<>(FXCollections.observableArrayList("mm", "cm", "m"));
+        unitCombo.setValue("mm");
+        unitCombo.setMaxWidth(Double.MAX_VALUE);
+        sectionUnit.bind(unitCombo.valueProperty());
 
         ComboBox<Sections.Shape> shape = new ComboBox<>(FXCollections.observableArrayList(Sections.Shape.values()));
         shape.setMaxWidth(Double.MAX_VALUE);
@@ -352,27 +381,69 @@ public class Toolkit {
         shape.valueProperty().addListener((o, ov, nv) -> updateInputs.run());
         shape.getSelectionModel().select(0);
 
-        calc.setOnAction(e -> {
+        final Sections.SectionResult[] last = { null };
+        Runnable render = () -> {
             resultsGrid.getChildren().clear();
+            if (last[0] == null) return;
+            renderSectionResultRows(resultsGrid, last[0], sectionUnit.get());
+        };
+
+        calc.setOnAction(e -> {
             try {
-                Sections.SectionResult r = computeShape(shape.getValue(), fields);
-                int row = 0;
-                for (var entry : r.asMap().entrySet()) {
-                    String unit = unitForSectionKey(entry.getKey());
-                    addPropertyRow(resultsGrid, row++, entry.getKey(),
-                        fmt(entry.getValue()) + " " + unit,
-                        entry.getKey(), entry.getValue());
-                }
+                last[0] = computeShape(shape.getValue(), fields);
+                render.run();
             } catch (Exception ex) {
+                resultsGrid.getChildren().clear();
                 Label err = new Label("Errore: " + ex.getMessage());
                 err.getStyleClass().add("toolkit-err");
                 resultsGrid.add(err, 0, 0, 3, 1);
             }
         });
 
-        box.getChildren().addAll(section("Forma"), shape, hint, inputs, calc, section("Risultati"), resultsGrid,
-                                 buildCommercialProfilesPanel());
+        sectionUnit.addListener((o, ov, nv) -> render.run());
+
+        box.getChildren().addAll(
+            section("Unità di misura"), unitCombo,
+            section("Forma"), shape, hint, inputs, calc,
+            section("Risultati"), resultsGrid,
+            buildCommercialProfilesPanel());
         return new Tab("Sezioni", scroll(box));
+    }
+
+    /** Render section result rows with scaling to selected linear unit (mm/cm/m). */
+    private void renderSectionResultRows(GridPane grid, Sections.SectionResult r, String linearUnit) {
+        for (var entry : r.asMap().entrySet()) {
+            String key = entry.getKey();
+            double valMm = entry.getValue();
+            double scaled = scaleSectionValue(key, valMm, linearUnit);
+            String unitStr = sectionUnitStr(key, linearUnit);
+            addPropertyRow(grid, grid.getChildren().size() / 3, key,
+                fmt(scaled) + (unitStr.isEmpty() ? "" : " " + unitStr),
+                key, scaled);
+        }
+    }
+
+    /** Scale a section property value from mm-based to selected linear unit. */
+    private double scaleSectionValue(String prop, double v_mm, String u) {
+        // Determine exponent of length for this property
+        int exp;
+        switch (prop) {
+            case "A":  exp = 2; break;
+            case "Ix": case "Iy": exp = 4; break;
+            case "Wx": case "Wy": exp = 3; break;
+            default: exp = 1; // perimetro, ix, iy, yc, xc
+        }
+        double base = u.equals("mm") ? 1.0 : u.equals("cm") ? 0.1 : 0.001;
+        return v_mm * Math.pow(base, exp);
+    }
+
+    private String sectionUnitStr(String prop, String linearUnit) {
+        switch (prop) {
+            case "A":  return linearUnit + "²";
+            case "Ix": case "Iy": return linearUnit + "⁴";
+            case "Wx": case "Wy": return linearUnit + "³";
+            default: return linearUnit;
+        }
     }
 
     private VBox buildCommercialProfilesPanel() {
@@ -393,6 +464,11 @@ public class Toolkit {
             @Override public Catalog.Profile fromString(String s) { return null; }
         });
 
+        // Length [m] input
+        TextField lenField = numField();
+        lenField.setText("1.0");
+        lenField.setPromptText("Lunghezza profilo [m]");
+
         GridPane out = new GridPane();
         out.setHgap(6); out.setVgap(4);
         out.getStyleClass().add("toolkit-table");
@@ -406,17 +482,34 @@ public class Toolkit {
             out.getChildren().clear();
             Catalog.Profile p = sizeCombo.getValue();
             if (p == null) return;
-            int r = 0;
-            addPropertyRow(out, r++, "h",    fmt(p.h())      + " mm",   "h",        p.h());
-            addPropertyRow(out, r++, "b",    fmt(p.b())      + " mm",   "b",        p.b());
-            addPropertyRow(out, r++, "tw",   fmt(p.tw())     + " mm",   "tw",       p.tw());
-            addPropertyRow(out, r++, "tf",   fmt(p.tf())     + " mm",   "tf",       p.tf());
-            addPropertyRow(out, r++, "A",    fmt(p.A())      + " mm²",  "A",        p.A());
-            addPropertyRow(out, r++, "Ix",   fmt(p.Ix())     + " mm⁴",  "Ix",       p.Ix());
-            addPropertyRow(out, r++, "Iy",   fmt(p.Iy())     + " mm⁴",  "Iy",       p.Iy());
-            addPropertyRow(out, r++, "Wx",   fmt(p.Wx())     + " mm³",  "Wx",       p.Wx());
-            addPropertyRow(out, r++, "Wy",   fmt(p.Wy())     + " mm³",  "Wy",       p.Wy());
-            addPropertyRow(out, r++, "kg/m", fmt(p.weight()) + "",      "kg_per_m", p.weight());
+            String u = sectionUnit.get();
+            // Dimensions (linear)
+            addPropertyRow(out, 0, "h",  fmt(scaleSectionValue("h",  p.h(),  u)) + " " + u, "h",  scaleSectionValue("h",  p.h(),  u));
+            addPropertyRow(out, 1, "b",  fmt(scaleSectionValue("b",  p.b(),  u)) + " " + u, "b",  scaleSectionValue("b",  p.b(),  u));
+            addPropertyRow(out, 2, "tw", fmt(scaleSectionValue("tw", p.tw(), u)) + " " + u, "tw", scaleSectionValue("tw", p.tw(), u));
+            addPropertyRow(out, 3, "tf", fmt(scaleSectionValue("tf", p.tf(), u)) + " " + u, "tf", scaleSectionValue("tf", p.tf(), u));
+            // Area / inertia / section modulus (scaled)
+            double aS  = scaleSectionValue("A",  p.A(),  u);
+            double ixS = scaleSectionValue("Ix", p.Ix(), u);
+            double iyS = scaleSectionValue("Iy", p.Iy(), u);
+            double wxS = scaleSectionValue("Wx", p.Wx(), u);
+            double wyS = scaleSectionValue("Wy", p.Wy(), u);
+            addPropertyRow(out, 4, "A",  fmt(aS)  + " " + u + "²", "A",  aS);
+            addPropertyRow(out, 5, "Ix", fmt(ixS) + " " + u + "⁴", "Ix", ixS);
+            addPropertyRow(out, 6, "Iy", fmt(iyS) + " " + u + "⁴", "Iy", iyS);
+            addPropertyRow(out, 7, "Wx", fmt(wxS) + " " + u + "³", "Wx", wxS);
+            addPropertyRow(out, 8, "Wy", fmt(wyS) + " " + u + "³", "Wy", wyS);
+            // Weight per meter (always kg/m, doesn't scale)
+            addPropertyRow(out, 9, "kg/m", fmt(p.weight()), "kg_per_m", p.weight());
+            // Total weight = weight × length
+            double L;
+            try { L = Double.parseDouble(lenField.getText().replace(",", ".").trim()); }
+            catch (Exception e) { L = Double.NaN; }
+            if (Double.isFinite(L) && L > 0) {
+                double totKg = p.weight() * L;
+                addPropertyRow(out, 10, "peso tot", fmt(totKg) + " kg (L=" + fmt(L) + " m)",
+                    "peso_tot", totKg);
+            }
         };
 
         seriesCombo.valueProperty().addListener((o, ov, nv) -> {
@@ -425,9 +518,12 @@ public class Toolkit {
             sizeCombo.setValue(nv.profiles().get(0));
         });
         sizeCombo.valueProperty().addListener((o, ov, nv) -> update.run());
+        lenField.textProperty().addListener((o, ov, nv) -> update.run());
+        sectionUnit.addListener((o, ov, nv) -> update.run());
         seriesCombo.getSelectionModel().select(0);
 
-        v.getChildren().addAll(seriesCombo, sizeCombo, out);
+        v.getChildren().addAll(seriesCombo, sizeCombo,
+            section("Lunghezza [m] (per peso totale)"), lenField, out);
         return v;
     }
 
@@ -456,6 +552,12 @@ public class Toolkit {
     private Tab buildFormulasTab() {
         VBox cards = new VBox(8);
         cards.setPadding(new Insets(12, 4, 12, 4));
+        cards.getChildren().add(description(
+            "12 formule pre-impostate per calcoli meccanici tipici: tensioni σ assiale/flessione, "
+            + "frecce trave (3 casi: appoggiata centrata, mensola, distribuito), Eulero buckling Pcr, "
+            + "coppia bullone T=K·d·F, saldatura fillet, hoop tubo, potenza meccanica P=T·ω, "
+            + "dilatazione termica, fattore di sicurezza η. Espandi una card → compila → Calcola → "
+            + "'Ins' inserisce il risultato, '→ var' lo salva come variabile nominata."));
         cards.getChildren().addAll(
             formulaCard("σ = F / A — Tensione assiale",
                 new String[][]{{"F", "Forza [N]"}, {"A", "Area [mm²]"}},
@@ -580,7 +682,14 @@ public class Toolkit {
             buildTimePane()
         );
         acc.setExpandedPane(acc.getPanes().get(0));
-        return new Tab("Procedure", scroll(new VBox(acc)));
+        VBox box = new VBox(8);
+        box.getChildren().add(description(
+            "Procedure guidate per dimensionamento: bulloni ISO M3-M48 con classi 4.6→12.9 "
+            + "(restituisce d, As, coppia serraggio, precarico), saldature fillet con materiale "
+            + "base, statistica su lista di numeri (media, σ, mediana, min/max), matrici 3×3 "
+            + "(det, inversa, trasposta, somma, prodotto), aritmetica HH:MM:SS."));
+        box.getChildren().add(acc);
+        return new Tab("Procedure", scroll(box));
     }
 
     private TitledPane buildBoltPane() {
@@ -975,7 +1084,14 @@ public class Toolkit {
             buildVariablesPane()
         );
         acc.setExpandedPane(acc.getPanes().get(0));
-        return new Tab("Strumenti", scroll(new VBox(acc)));
+        VBox box = new VBox(8);
+        box.getChildren().add(description(
+            "Risolutori e tabelle: triangoli (qualunque combinazione SSS / SAS / SSA / ASA / AAS), "
+            + "operazioni vettori 3D (modulo, prodotto scalare, vettoriale, angolo, proiezione), "
+            + "solver f(x)=0 con Newton-Raphson (vede le variabili definite), schede tubi "
+            + "ASME B36.10 (DN15→DN300, Sch 40 e 80), gestione tabella variabili nominate."));
+        box.getChildren().add(acc);
+        return new Tab("Strumenti", scroll(box));
     }
 
     // --- Triangle solver ---
@@ -1393,6 +1509,14 @@ public class Toolkit {
         Label l = new Label(s);
         l.getStyleClass().add("toolkit-hint");
         l.setWrapText(true);
+        return l;
+    }
+
+    private static Label description(String s) {
+        Label l = new Label(s);
+        l.getStyleClass().add("tab-description");
+        l.setWrapText(true);
+        l.setMaxWidth(Double.MAX_VALUE);
         return l;
     }
 
