@@ -55,6 +55,16 @@ public class Toolkit {
     private Label subtitleLabel;
     private VBox contentHolder;
 
+    // ---- Sezioni sub-carousel state ----
+    private static final String[] SEZ_NAMES = { "Profili", "Piatti e sezioni", "Tubi" };
+    private int sezioniIdx = 1; // start centered on "Piatti e sezioni"
+    private final Label[] carouselLabels = new Label[3];
+    private HBox carouselBox;
+    private javafx.scene.layout.StackPane subtitleHost;
+    private javafx.scene.layout.StackPane sezContentHost;
+    private final Node[] sezSubPanes = new Node[3];
+    private boolean carouselAnimating = false;
+
     public Toolkit(Bridge bridge, Runnable closeAction, Runnable backAction) {
         this.bridge = bridge;
         this.closeAction = closeAction;
@@ -78,7 +88,87 @@ public class Toolkit {
         Node pane = sectionPanes.get(resolved);
         contentHolder.getChildren().setAll(pane);
         VBox.setVgrow(pane, Priority.ALWAYS);
-        subtitleLabel.setText(resolved);
+
+        // Swap subtitle: carousel for "Sezioni", plain label otherwise
+        subtitleHost.getChildren().clear();
+        if ("Sezioni".equalsIgnoreCase(resolved)) {
+            subtitleHost.getChildren().add(carouselBox);
+            updateCarousel();
+        } else {
+            subtitleLabel.setText(resolved);
+            subtitleHost.getChildren().add(subtitleLabel);
+        }
+    }
+
+    // ====================== Sezioni carousel ======================
+    private HBox buildCarousel() {
+        HBox c = new HBox(18);
+        c.setAlignment(Pos.CENTER);
+        c.getStyleClass().add("toolkit-carousel");
+        for (int i = 0; i < 3; i++) {
+            Label l = new Label("");
+            carouselLabels[i] = l;
+            l.getStyleClass().add(i == 1 ? "carousel-center" : "carousel-side");
+            final int delta = i - 1;
+            l.setOnMouseClicked(e -> goToSezioni(sezioniIdx + delta));
+            c.getChildren().add(l);
+        }
+        return c;
+    }
+
+    private void updateCarousel() {
+        carouselLabels[0].setText(sezioniIdx > 0 ? SEZ_NAMES[sezioniIdx - 1] : "");
+        carouselLabels[1].setText(SEZ_NAMES[sezioniIdx]);
+        carouselLabels[2].setText(sezioniIdx < SEZ_NAMES.length - 1 ? SEZ_NAMES[sezioniIdx + 1] : "");
+    }
+
+    private void goToSezioni(int newIdx) {
+        if (newIdx < 0 || newIdx >= SEZ_NAMES.length || newIdx == sezioniIdx) return;
+        if (carouselAnimating) return;
+        if (sezContentHost == null || sezSubPanes[newIdx] == null) return;
+        carouselAnimating = true;
+
+        int dir = newIdx > sezioniIdx ? 1 : -1;
+        Node oldPane = sezContentHost.getChildren().isEmpty() ? null : sezContentHost.getChildren().get(0);
+        Node newPane = sezSubPanes[newIdx];
+        double w = sezContentHost.getWidth();
+        if (w <= 0) w = 320;
+
+        sezContentHost.getChildren().add(newPane);
+        newPane.setTranslateX(dir * w);
+        newPane.setOpacity(0);
+
+        javafx.animation.TranslateTransition tIn =
+            new javafx.animation.TranslateTransition(javafx.util.Duration.millis(280), newPane);
+        tIn.setFromX(dir * w); tIn.setToX(0);
+        javafx.animation.FadeTransition fIn =
+            new javafx.animation.FadeTransition(javafx.util.Duration.millis(280), newPane);
+        fIn.setFromValue(0); fIn.setToValue(1);
+
+        javafx.animation.ParallelTransition pt;
+        if (oldPane != null) {
+            javafx.animation.TranslateTransition tOut =
+                new javafx.animation.TranslateTransition(javafx.util.Duration.millis(280), oldPane);
+            tOut.setFromX(0); tOut.setToX(-dir * w);
+            javafx.animation.FadeTransition fOut =
+                new javafx.animation.FadeTransition(javafx.util.Duration.millis(280), oldPane);
+            fOut.setFromValue(1); fOut.setToValue(0);
+            pt = new javafx.animation.ParallelTransition(tOut, fOut, tIn, fIn);
+        } else {
+            pt = new javafx.animation.ParallelTransition(tIn, fIn);
+        }
+        final Node oldRef = oldPane;
+        pt.setOnFinished(e -> {
+            if (oldRef != null) {
+                sezContentHost.getChildren().remove(oldRef);
+                oldRef.setTranslateX(0);
+                oldRef.setOpacity(1);
+            }
+            carouselAnimating = false;
+        });
+        sezioniIdx = newIdx;
+        updateCarousel();
+        pt.play();
     }
 
     public Node buildPanel() {
@@ -98,7 +188,13 @@ public class Toolkit {
         subtitleLabel.setMaxWidth(Double.MAX_VALUE);
         subtitleLabel.setAlignment(Pos.CENTER);
 
-        VBox titleBox = new VBox(2, title, subtitleLabel);
+        carouselBox = buildCarousel();
+
+        subtitleHost = new javafx.scene.layout.StackPane();
+        subtitleHost.setAlignment(Pos.CENTER);
+        subtitleHost.getChildren().add(subtitleLabel);
+
+        VBox titleBox = new VBox(2, title, subtitleHost);
         titleBox.setAlignment(Pos.CENTER);
         HBox.setHgrow(titleBox, Priority.ALWAYS);
 
@@ -334,21 +430,19 @@ public class Toolkit {
         box.setPadding(new Insets(12, 4, 12, 4));
 
         box.getChildren().add(description(
-            "Proprietà geometriche di sezioni trasversali (A, Ix, Iy, Wx, Wy, raggi giraz., "
-            + "perimetro, baricentro xc/yc) per forme parametriche e profili commerciali "
-            + "(IPE/HEA/HEB/UPN). Se selezioni un materiale viene aggiunto il peso lineare kg/m. "
-            + "Per piastre/lamiere 3D usa 'Piatto / Lamiera' che richiede anche lo spessore e "
-            + "calcola area superficie, volume e massa."));
+            "Naviga le sotto-sezioni con il carosello in alto: 'Piatti e sezioni' "
+            + "(forme parametriche 2D+3D), 'Profili' (IPE/HEA/HEB/UPN), 'Tubi' (ASME B36.10). "
+            + "I selettori Unità e Materiale qui sotto valgono per tutte e tre."));
 
-        // Linear-unit selector (drives the display unit for all results in this tab)
+        // ---- Shared unit selector ----
         ComboBox<String> unitCombo = new ComboBox<>(FXCollections.observableArrayList("mm", "cm", "m"));
         unitCombo.setValue("mm");
         unitCombo.setMaxWidth(Double.MAX_VALUE);
         sectionUnit.bind(unitCombo.valueProperty());
 
-        // Material selector (drives weight calc). "Nessuno" = no weight.
+        // ---- Shared material selector ----
         ObservableList<Catalog.Material> matOptions = FXCollections.observableArrayList();
-        matOptions.add(null); // placeholder for "Nessuno"
+        matOptions.add(null);
         matOptions.addAll(Catalog.MATERIALS);
         ComboBox<Catalog.Material> matCombo = new ComboBox<>(matOptions);
         matCombo.setMaxWidth(Double.MAX_VALUE);
@@ -358,6 +452,31 @@ public class Toolkit {
         });
         matCombo.getSelectionModel().select(0);
         sectionMaterial.bind(matCombo.valueProperty());
+
+        box.getChildren().addAll(
+            section("Unità di misura"), unitCombo,
+            section("Materiale (per peso)"), matCombo);
+
+        // ---- Build 3 sub-panes ----
+        sezSubPanes[0] = buildCommercialProfilesPanel(); // Profili
+        sezSubPanes[1] = buildParametricSectionsPane(); // Piatti e sezioni
+        sezSubPanes[2] = buildPipesPanel();              // Tubi
+
+        sezContentHost = new javafx.scene.layout.StackPane();
+        sezContentHost.getChildren().add(sezSubPanes[sezioniIdx]);
+        sezContentHost.setMinHeight(280);
+        // Clip overflow during slide animation
+        javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
+        clip.widthProperty().bind(sezContentHost.widthProperty());
+        clip.heightProperty().bind(sezContentHost.heightProperty());
+        sezContentHost.setClip(clip);
+
+        box.getChildren().add(sezContentHost);
+        return new Tab("Sezioni", scroll(box));
+    }
+
+    private VBox buildParametricSectionsPane() {
+        VBox box = new VBox(8);
 
         ComboBox<Sections.Shape> shape = new ComboBox<>(FXCollections.observableArrayList(Sections.Shape.values()));
         shape.setMaxWidth(Double.MAX_VALUE);
@@ -434,7 +553,7 @@ public class Toolkit {
         shape.valueProperty().addListener((o, ov, nv) -> updateInputs.run());
         shape.getSelectionModel().select(0);
 
-        final Object[] last = { null }; // SectionResult or PlateResult
+        final Object[] last = { null };
         final Sections.Shape[] lastShape = { null };
         Runnable render = () -> {
             resultsGrid.getChildren().clear();
@@ -470,12 +589,9 @@ public class Toolkit {
         sectionMaterial.addListener((o, ov, nv) -> render.run());
 
         box.getChildren().addAll(
-            section("Unità di misura"), unitCombo,
-            section("Materiale (per peso)"), matCombo,
             section("Forma"), shape, hint, inputs, calc,
-            section("Risultati"), resultsGrid,
-            buildCommercialProfilesPanel());
-        return new Tab("Sezioni", scroll(box));
+            section("Risultati"), resultsGrid);
+        return box;
     }
 
     /** Render section result rows with scaling + optional material weight. */
@@ -1195,16 +1311,15 @@ public class Toolkit {
             buildTrianglePane(),
             buildVectorsPane(),
             buildSolverPane(),
-            buildPipesPane(),
             buildVariablesPane()
         );
         acc.setExpandedPane(acc.getPanes().get(0));
         VBox box = new VBox(8);
         box.getChildren().add(description(
-            "Risolutori e tabelle: triangoli (qualunque combinazione SSS / SAS / SSA / ASA / AAS), "
+            "Risolutori e gestione: triangoli (qualunque combinazione SSS / SAS / SSA / ASA / AAS), "
             + "operazioni vettori 3D (modulo, prodotto scalare, vettoriale, angolo, proiezione), "
-            + "solver f(x)=0 con Newton-Raphson (vede le variabili definite), schede tubi "
-            + "ASME B36.10 (DN15→DN300, Sch 40 e 80), gestione tabella variabili nominate."));
+            + "solver f(x)=0 con Newton-Raphson (vede le variabili definite), tabella variabili nominate. "
+            + "I tubi ASME B36.10 li trovi in Sezioni → Tubi."));
         box.getChildren().add(acc);
         return new Tab("Strumenti", scroll(box));
     }
@@ -1460,10 +1575,9 @@ public class Toolkit {
     }
 
     // --- Pipes ---
-    private TitledPane buildPipesPane() {
+    private VBox buildPipesPanel() {
         ComboBox<String> dnCombo = new ComboBox<>();
         ComboBox<String> schCombo = new ComboBox<>();
-        // collect unique DN and Sch
         List<String> dns = new ArrayList<>();
         List<String> schs = new ArrayList<>();
         for (Catalog.Pipe p : Catalog.PIPES) {
@@ -1512,12 +1626,11 @@ public class Toolkit {
         dnCombo.getSelectionModel().select(0);
         schCombo.getSelectionModel().select(0);
 
-        VBox content = new VBox(6,
+        return new VBox(6,
             label("DN:"), dnCombo,
             label("Schedule:"), schCombo,
             label("Dati:"), out
         );
-        return new TitledPane("Tubi (ASME B36.10)", content);
     }
 
     // --- Variables ---
