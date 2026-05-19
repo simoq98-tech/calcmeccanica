@@ -37,7 +37,27 @@ public final class Sections {
         }
     }
 
-    public enum Shape { RETTANGOLO, RETTANGOLO_CAVO, CERCHIO, TUBO, PROFILO_T, PROFILO_L }
+    public enum Shape { RETTANGOLO, RETTANGOLO_CAVO, CERCHIO, TUBO, PROFILO_T, PROFILO_L, PIATTO }
+
+    /** Result for a plate / sheet (3D body, not a cross-section). */
+    public record PlateResult(
+        double surface,  // mm² (b × h)
+        double volume,   // mm³ (b × h × s)
+        double thickness // mm
+    ) {
+        public Map<String, Double> asMap() {
+            Map<String, Double> m = new LinkedHashMap<>();
+            m.put("surface",   surface);
+            m.put("volume",    volume);
+            m.put("thickness", thickness);
+            return m;
+        }
+    }
+
+    public static PlateResult plate(double b, double h, double s) {
+        if (b <= 0 || h <= 0 || s <= 0) throw new IllegalArgumentException("Dimensioni devono essere positive");
+        return new PlateResult(b * h, b * h * s, s);
+    }
 
     public static SectionResult rectangle(double b, double h) {
         double A  = b*h;

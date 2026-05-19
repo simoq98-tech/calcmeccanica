@@ -3,6 +3,7 @@ package calc;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -324,22 +325,39 @@ public class Toolkit {
     private final javafx.beans.property.StringProperty sectionUnit =
         new javafx.beans.property.SimpleStringProperty("mm");
 
+    /** Currently-selected material (drives weight calculations). null = none. */
+    private final javafx.beans.property.ObjectProperty<Catalog.Material> sectionMaterial =
+        new javafx.beans.property.SimpleObjectProperty<>(null);
+
     private Tab buildSectionsTab() {
         VBox box = new VBox(10);
         box.setPadding(new Insets(12, 4, 12, 4));
 
         box.getChildren().add(description(
-            "Proprietà geometriche di sezioni (area A, momenti d'inerzia Ix/Iy, moduli "
-            + "di resistenza Wx/Wy, raggi di girazione ix/iy, perimetro). Disponibili forme "
-            + "parametriche (rettangolo, rettangolo cavo, cerchio, tubo) e profili commerciali "
-            + "(IPE, HEA, HEB, UPN). Cambia l'unità per il display: i valori si riscalano "
-            + "automaticamente."));
+            "Proprietà geometriche di sezioni trasversali (A, Ix, Iy, Wx, Wy, raggi giraz., "
+            + "perimetro, baricentro xc/yc) per forme parametriche e profili commerciali "
+            + "(IPE/HEA/HEB/UPN). Se selezioni un materiale viene aggiunto il peso lineare kg/m. "
+            + "Per piastre/lamiere 3D usa 'Piatto / Lamiera' che richiede anche lo spessore e "
+            + "calcola area superficie, volume e massa."));
 
         // Linear-unit selector (drives the display unit for all results in this tab)
         ComboBox<String> unitCombo = new ComboBox<>(FXCollections.observableArrayList("mm", "cm", "m"));
         unitCombo.setValue("mm");
         unitCombo.setMaxWidth(Double.MAX_VALUE);
         sectionUnit.bind(unitCombo.valueProperty());
+
+        // Material selector (drives weight calc). "Nessuno" = no weight.
+        ObservableList<Catalog.Material> matOptions = FXCollections.observableArrayList();
+        matOptions.add(null); // placeholder for "Nessuno"
+        matOptions.addAll(Catalog.MATERIALS);
+        ComboBox<Catalog.Material> matCombo = new ComboBox<>(matOptions);
+        matCombo.setMaxWidth(Double.MAX_VALUE);
+        matCombo.setConverter(new StringConverter<>() {
+            @Override public String toString(Catalog.Material m) { return m == null ? "— nessuno (no peso) —" : m.name(); }
+            @Override public Catalog.Material fromString(String s) { return null; }
+        });
+        matCombo.getSelectionModel().select(0);
+        sectionMaterial.bind(matCombo.valueProperty());
 
         ComboBox<Sections.Shape> shape = new ComboBox<>(FXCollections.observableArrayList(Sections.Shape.values()));
         shape.setMaxWidth(Double.MAX_VALUE);
@@ -353,6 +371,7 @@ public class Toolkit {
                     case TUBO -> "Tubo (De × t)";
                     case PROFILO_T -> "Profilo T (b × h × tf × tw)";
                     case PROFILO_L -> "Profilo L equilatero (a × t)";
+                    case PIATTO   -> "Piatto / Lamiera 3D (b × h × s)";
                 };
             }
             @Override public Sections.Shape fromString(String s) { return null; }
@@ -402,26 +421,42 @@ public class Toolkit {
                 case TUBO             -> new String[]{"De [mm]", "t [mm]"};
                 case PROFILO_T        -> new String[]{"b [mm]", "h [mm]", "tf [mm]", "tw [mm]"};
                 case PROFILO_L        -> new String[]{"a [mm]", "t [mm]"};
+                case PIATTO           -> new String[]{"b [mm]", "h [mm]", "s [mm]"};
             };
             for (int i = 0; i < names.length; i++) {
                 labels[i].setText(names[i]);
                 fields[i].setVisible(true);
             }
-            hint.setText("Unità: mm → output in mm², mm³, mm⁴");
+            hint.setText(s == Sections.Shape.PIATTO
+                ? "Lastra 3D: area superficie, volume, massa (con materiale)."
+                : "Sezione trasversale: A, I, W, baricentro. Con materiale: peso lineare kg/m.");
         };
         shape.valueProperty().addListener((o, ov, nv) -> updateInputs.run());
         shape.getSelectionModel().select(0);
 
-        final Sections.SectionResult[] last = { null };
+        final Object[] last = { null }; // SectionResult or PlateResult
+        final Sections.Shape[] lastShape = { null };
         Runnable render = () -> {
             resultsGrid.getChildren().clear();
             if (last[0] == null) return;
-            renderSectionResultRows(resultsGrid, last[0], sectionUnit.get());
+            Catalog.Material mat = sectionMaterial.get();
+            if (last[0] instanceof Sections.PlateResult pr) {
+                renderPlateResultRows(resultsGrid, pr, sectionUnit.get(), mat);
+            } else if (last[0] instanceof Sections.SectionResult sr) {
+                renderSectionResultRows(resultsGrid, sr, sectionUnit.get(), mat);
+            }
         };
 
         calc.setOnAction(e -> {
             try {
-                last[0] = computeShape(shape.getValue(), fields);
+                lastShape[0] = shape.getValue();
+                if (lastShape[0] == Sections.Shape.PIATTO) {
+                    last[0] = Sections.plate(parseDouble(fields[0].getText()),
+                                              parseDouble(fields[1].getText()),
+                                              parseDouble(fields[2].getText()));
+                } else {
+                    last[0] = computeShape(lastShape[0], fields);
+                }
                 render.run();
             } catch (Exception ex) {
                 resultsGrid.getChildren().clear();
@@ -432,25 +467,64 @@ public class Toolkit {
         });
 
         sectionUnit.addListener((o, ov, nv) -> render.run());
+        sectionMaterial.addListener((o, ov, nv) -> render.run());
 
         box.getChildren().addAll(
             section("Unità di misura"), unitCombo,
+            section("Materiale (per peso)"), matCombo,
             section("Forma"), shape, hint, inputs, calc,
             section("Risultati"), resultsGrid,
             buildCommercialProfilesPanel());
         return new Tab("Sezioni", scroll(box));
     }
 
-    /** Render section result rows with scaling to selected linear unit (mm/cm/m). */
-    private void renderSectionResultRows(GridPane grid, Sections.SectionResult r, String linearUnit) {
+    /** Render section result rows with scaling + optional material weight. */
+    private void renderSectionResultRows(GridPane grid, Sections.SectionResult r, String linearUnit, Catalog.Material mat) {
+        int row = 0;
         for (var entry : r.asMap().entrySet()) {
             String key = entry.getKey();
             double valMm = entry.getValue();
             double scaled = scaleSectionValue(key, valMm, linearUnit);
             String unitStr = sectionUnitStr(key, linearUnit);
-            addPropertyRow(grid, grid.getChildren().size() / 3, key,
+            String label = switch (key) {
+                case "yc" -> "baricentro yc";
+                case "xc" -> "baricentro xc";
+                default   -> key;
+            };
+            addPropertyRow(grid, row++, label,
                 fmt(scaled) + (unitStr.isEmpty() ? "" : " " + unitStr),
                 key, scaled);
+        }
+        // Linear weight kg/m = A [m²] × ρ [kg/m³]
+        if (mat != null) {
+            double a_m2 = r.A() * 1e-6;
+            double kgPerM = a_m2 * mat.rho();
+            addPropertyRow(grid, row++, "kg/m  (" + mat.name() + ")",
+                fmt(kgPerM) + " kg/m", "kg_per_m", kgPerM);
+        }
+    }
+
+    /** Render plate (3D body) result rows. */
+    private void renderPlateResultRows(GridPane grid, Sections.PlateResult r, String linearUnit, Catalog.Material mat) {
+        int row = 0;
+        // Surface area
+        double surface = scaleSectionValue("A", r.surface(), linearUnit);
+        addPropertyRow(grid, row++, "area superficie",
+            fmt(surface) + " " + linearUnit + "²", "surface", surface);
+        // Volume: scale by linearUnit³
+        double volFactor = linearUnit.equals("mm") ? 1.0 : linearUnit.equals("cm") ? 1e-3 : 1e-9;
+        double vol = r.volume() * volFactor;
+        addPropertyRow(grid, row++, "volume",
+            fmt(vol) + " " + linearUnit + "³", "volume", vol);
+        // Thickness in linear unit
+        double thk = scaleSectionValue("s", r.thickness(), linearUnit);
+        addPropertyRow(grid, row++, "spessore", fmt(thk) + " " + linearUnit, "s", thk);
+        // Mass (if material)
+        if (mat != null) {
+            double vol_m3 = r.volume() * 1e-9;
+            double mass = vol_m3 * mat.rho();
+            addPropertyRow(grid, row++, "massa  (" + mat.name() + ")",
+                fmt(mass) + " kg", "massa", mass);
         }
     }
 
@@ -530,15 +604,24 @@ public class Toolkit {
             addPropertyRow(out, 6, "Iy", fmt(iyS) + " " + u + "⁴", "Iy", iyS);
             addPropertyRow(out, 7, "Wx", fmt(wxS) + " " + u + "³", "Wx", wxS);
             addPropertyRow(out, 8, "Wy", fmt(wyS) + " " + u + "³", "Wy", wyS);
-            // Weight per meter (always kg/m, doesn't scale)
-            addPropertyRow(out, 9, "kg/m", fmt(p.weight()), "kg_per_m", p.weight());
+            // Weight per meter (always kg/m, doesn't scale). Profile catalog kg/m assumes steel ρ=7850.
+            int r2 = 9;
+            addPropertyRow(out, r2++, "kg/m (acciaio)", fmt(p.weight()), "kg_per_m", p.weight());
+            // If user picked a different material, recompute kg/m from area × rho
+            Catalog.Material mat = sectionMaterial.get();
+            if (mat != null && Math.abs(mat.rho() - 7850) > 1) {
+                double altKgPerM = (p.A() * 1e-6) * mat.rho();
+                addPropertyRow(out, r2++, "kg/m (" + mat.name() + ")",
+                    fmt(altKgPerM), "kg_per_m_mat", altKgPerM);
+            }
             // Total weight = weight × length
             double L;
             try { L = Double.parseDouble(lenField.getText().replace(",", ".").trim()); }
             catch (Exception e) { L = Double.NaN; }
             if (Double.isFinite(L) && L > 0) {
-                double totKg = p.weight() * L;
-                addPropertyRow(out, 10, "peso tot", fmt(totKg) + " kg (L=" + fmt(L) + " m)",
+                double weightUsed = (mat != null) ? (p.A() * 1e-6) * mat.rho() : p.weight();
+                double totKg = weightUsed * L;
+                addPropertyRow(out, r2++, "peso tot", fmt(totKg) + " kg (L=" + fmt(L) + " m)",
                     "peso_tot", totKg);
             }
         };
@@ -567,6 +650,7 @@ public class Toolkit {
             case TUBO -> Sections.tube(v0, parseDouble(f[1].getText()));
             case PROFILO_T -> Sections.tProfile(v0, parseDouble(f[1].getText()), parseDouble(f[2].getText()), parseDouble(f[3].getText()));
             case PROFILO_L -> Sections.lProfile(v0, parseDouble(f[1].getText()));
+            case PIATTO    -> throw new IllegalStateException("PIATTO va gestito separatamente (plate())");
         };
     }
 
