@@ -113,16 +113,28 @@ public class Toolkit {
                 goToSezioni(target, delta);
             });
         }
-        // Equal-width side wrappers so the center label sits at the geometric center
+        // Side labels go in fixed-width wrappers anchored toward the centre, with text overrun=clip
+        carouselLabels[0].setMaxWidth(Double.MAX_VALUE);
+        carouselLabels[2].setMaxWidth(Double.MAX_VALUE);
+        carouselLabels[0].setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
+        carouselLabels[2].setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
+
         HBox leftWrap = new HBox(carouselLabels[0]);
         leftWrap.setAlignment(Pos.CENTER_RIGHT);
-        leftWrap.setMinWidth(100); leftWrap.setMaxWidth(100); leftWrap.setPrefWidth(100);
+        leftWrap.setMinWidth(105); leftWrap.setMaxWidth(105); leftWrap.setPrefWidth(105);
 
         HBox rightWrap = new HBox(carouselLabels[2]);
         rightWrap.setAlignment(Pos.CENTER_LEFT);
-        rightWrap.setMinWidth(100); rightWrap.setMaxWidth(100); rightWrap.setPrefWidth(100);
+        rightWrap.setMinWidth(105); rightWrap.setMaxWidth(105); rightWrap.setPrefWidth(105);
 
-        HBox c = new HBox(2, leftWrap, carouselLabels[1], rightWrap);
+        // Centre wrapper grows to fill the remaining space → centre label always at geometric centre.
+        HBox centerWrap = new HBox(carouselLabels[1]);
+        centerWrap.setAlignment(Pos.CENTER);
+        HBox.setHgrow(centerWrap, Priority.ALWAYS);
+        carouselLabels[1].setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
+        carouselLabels[1].setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+
+        HBox c = new HBox(2, leftWrap, centerWrap, rightWrap);
         c.setAlignment(Pos.CENTER);
         c.getStyleClass().add("toolkit-carousel");
         return c;
