@@ -56,8 +56,8 @@ public class Toolkit {
     private VBox contentHolder;
 
     // ---- Sezioni sub-carousel state ----
-    private static final String[] SEZ_NAMES = { "Profili", "Piatti e sezioni", "Tubi" };
-    private int sezioniIdx = 1; // start centered on "Piatti e sezioni"
+    private static final String[] SEZ_NAMES = { "Profili", "Piatti", "Tubi" };
+    private int sezioniIdx = 1; // start centered on "Piatti"
     private final Label[] carouselLabels = new Label[3];
     private HBox carouselBox;
     private javafx.scene.layout.StackPane subtitleHost;
@@ -529,23 +529,28 @@ public class Toolkit {
             @Override public Sections.Shape fromString(String s) { return null; }
         });
 
-        GridPane inputs = new GridPane();
-        inputs.setHgap(6); inputs.setVgap(4);
+        VBox inputs = new VBox(4);
         inputs.setMaxWidth(Double.MAX_VALUE);
-        for (int c = 0; c < 4; c++) {
-            ColumnConstraints cc = new ColumnConstraints();
-            cc.setPercentWidth(25);
-            inputs.getColumnConstraints().add(cc);
-        }
+        inputs.setMinWidth(0);
+        inputs.setFillWidth(true);
         TextField[] fields = new TextField[4];
         Label[] labels = new Label[4];
+        HBox[] rows = new HBox[4];
         for (int i = 0; i < 4; i++) {
             labels[i] = new Label("");
             labels[i].getStyleClass().add("toolkit-key");
+            labels[i].setMinWidth(60);
+            labels[i].setPrefWidth(60);
+            labels[i].setMaxWidth(60);
             fields[i] = numField();
+            fields[i].setPrefColumnCount(6);
+            fields[i].setMinWidth(0);
             fields[i].setMaxWidth(Double.MAX_VALUE);
-            inputs.add(labels[i], 0, i);
-            inputs.add(fields[i], 1, i, 3, 1);
+            HBox.setHgrow(fields[i], Priority.ALWAYS);
+            rows[i] = new HBox(6, labels[i], fields[i]);
+            rows[i].setAlignment(Pos.CENTER_LEFT);
+            rows[i].setMinWidth(0);
+            inputs.getChildren().add(rows[i]);
         }
 
         GridPane resultsGrid = new GridPane();
@@ -567,7 +572,7 @@ public class Toolkit {
         Runnable updateInputs = () -> {
             Sections.Shape s = shape.getValue();
             if (s == null) return;
-            for (int i = 0; i < 4; i++) { labels[i].setText(""); fields[i].setVisible(false); fields[i].setText(""); }
+            for (int i = 0; i < 4; i++) { labels[i].setText(""); fields[i].setText(""); rows[i].setVisible(false); rows[i].setManaged(false); }
             String[] names = switch (s) {
                 case RETTANGOLO       -> new String[]{"b [mm]", "h [mm]"};
                 case RETTANGOLO_CAVO  -> new String[]{"b [mm]", "h [mm]", "t [mm]"};
@@ -579,7 +584,8 @@ public class Toolkit {
             };
             for (int i = 0; i < names.length; i++) {
                 labels[i].setText(names[i]);
-                fields[i].setVisible(true);
+                rows[i].setVisible(true);
+                rows[i].setManaged(true);
             }
             hint.setText(s == Sections.Shape.PIATTO
                 ? "Lastra 3D: area superficie, volume, massa (con materiale)."
