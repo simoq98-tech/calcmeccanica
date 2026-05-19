@@ -102,33 +102,40 @@ public class Toolkit {
 
     // ====================== Sezioni carousel ======================
     private HBox buildCarousel() {
-        HBox c = new HBox(18);
+        HBox c = new HBox(4);
         c.setAlignment(Pos.CENTER);
         c.getStyleClass().add("toolkit-carousel");
         for (int i = 0; i < 3; i++) {
             Label l = new Label("");
             carouselLabels[i] = l;
             l.getStyleClass().add(i == 1 ? "carousel-center" : "carousel-side");
-            final int delta = i - 1;
-            l.setOnMouseClicked(e -> goToSezioni(sezioniIdx + delta));
+            final int delta = i - 1; // -1 left, 0 center, +1 right
+            l.setOnMouseClicked(e -> {
+                if (delta == 0) return;
+                int target = delta > 0 ? nextSezIdx() : prevSezIdx();
+                goToSezioni(target, delta);
+            });
             c.getChildren().add(l);
         }
         return c;
     }
 
+    private int prevSezIdx() { return (sezioniIdx - 1 + SEZ_NAMES.length) % SEZ_NAMES.length; }
+    private int nextSezIdx() { return (sezioniIdx + 1) % SEZ_NAMES.length; }
+
     private void updateCarousel() {
-        carouselLabels[0].setText(sezioniIdx > 0 ? SEZ_NAMES[sezioniIdx - 1] : "");
+        carouselLabels[0].setText(SEZ_NAMES[prevSezIdx()]);
         carouselLabels[1].setText(SEZ_NAMES[sezioniIdx]);
-        carouselLabels[2].setText(sezioniIdx < SEZ_NAMES.length - 1 ? SEZ_NAMES[sezioniIdx + 1] : "");
+        carouselLabels[2].setText(SEZ_NAMES[nextSezIdx()]);
     }
 
-    private void goToSezioni(int newIdx) {
-        if (newIdx < 0 || newIdx >= SEZ_NAMES.length || newIdx == sezioniIdx) return;
+    private void goToSezioni(int newIdx, int direction) {
+        if (newIdx == sezioniIdx) return;
         if (carouselAnimating) return;
         if (sezContentHost == null || sezSubPanes[newIdx] == null) return;
         carouselAnimating = true;
 
-        int dir = newIdx > sezioniIdx ? 1 : -1;
+        int dir = direction;
         Node oldPane = sezContentHost.getChildren().isEmpty() ? null : sezContentHost.getChildren().get(0);
         Node newPane = sezSubPanes[newIdx];
         double w = sezContentHost.getWidth();
@@ -429,11 +436,6 @@ public class Toolkit {
         VBox box = new VBox(10);
         box.setPadding(new Insets(12, 4, 12, 4));
 
-        box.getChildren().add(description(
-            "Naviga le sotto-sezioni con il carosello in alto: 'Piatti e sezioni' "
-            + "(forme parametriche 2D+3D), 'Profili' (IPE/HEA/HEB/UPN), 'Tubi' (ASME B36.10). "
-            + "I selettori Unità e Materiale qui sotto valgono per tutte e tre."));
-
         // ---- Shared unit selector ----
         ComboBox<String> unitCombo = new ComboBox<>(FXCollections.observableArrayList("mm", "cm", "m"));
         unitCombo.setValue("mm");
@@ -477,6 +479,11 @@ public class Toolkit {
 
     private VBox buildParametricSectionsPane() {
         VBox box = new VBox(8);
+        box.getChildren().add(description(
+            "Forme parametriche: rettangolo, rettangolo cavo, cerchio pieno, tubo, profilo T, "
+            + "profilo L equilatero (sezioni 2D → A, Ix, Iy, Wx, Wy, raggi giraz., perimetro, "
+            + "baricentro). Più 'Piatto / Lamiera 3D' con spessore → area superficie, volume, "
+            + "massa. Con materiale selezionato calcola anche il peso lineare kg/m."));
 
         ComboBox<Sections.Shape> shape = new ComboBox<>(FXCollections.observableArrayList(Sections.Shape.values()));
         shape.setMaxWidth(Double.MAX_VALUE);
@@ -669,6 +676,11 @@ public class Toolkit {
 
     private VBox buildCommercialProfilesPanel() {
         VBox v = new VBox(6);
+        v.getChildren().add(description(
+            "Profili strutturali normalizzati IPE (a I), HEA / HEB (a H), UPN (a U) con "
+            + "dimensioni h/b/tw/tf, area A, momenti d'inerzia Ix/Iy, moduli Wx/Wy e peso "
+            + "kg/m (catalogo acciaio ρ=7850). Inserisci la lunghezza in metri per il peso "
+            + "totale del tratto."));
         v.getChildren().add(section("Profili commerciali (IPE/HEA/HEB/UPN)"));
 
         ComboBox<Catalog.ProfileSeries> seriesCombo = new ComboBox<>(FXCollections.observableArrayList(Catalog.PROFILE_SERIES));
@@ -1576,6 +1588,10 @@ public class Toolkit {
 
     // --- Pipes ---
     private VBox buildPipesPanel() {
+        Label desc = description(
+            "Tubi commerciali ASME B36.10 (DN15 → DN300, schedule 40 e 80). Restituisce "
+            + "diametro esterno OD, spessore, diametro interno ID, peso al metro, volume "
+            + "interno L/m e designazione NPS (Nominal Pipe Size).");
         ComboBox<String> dnCombo = new ComboBox<>();
         ComboBox<String> schCombo = new ComboBox<>();
         List<String> dns = new ArrayList<>();
@@ -1627,6 +1643,7 @@ public class Toolkit {
         schCombo.getSelectionModel().select(0);
 
         return new VBox(6,
+            desc,
             label("DN:"), dnCombo,
             label("Schedule:"), schCombo,
             label("Dati:"), out
