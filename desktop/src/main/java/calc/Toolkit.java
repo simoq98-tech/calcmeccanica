@@ -487,6 +487,8 @@ public class Toolkit {
         sezContentHost = new javafx.scene.layout.StackPane();
         sezContentHost.getChildren().add(sezSubPanes[sezioniIdx]);
         sezContentHost.setMinHeight(280);
+        sezContentHost.setMinWidth(0);
+        sezContentHost.setMaxWidth(Double.MAX_VALUE);
         // Clip overflow during slide animation
         javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
         clip.widthProperty().bind(sezContentHost.widthProperty());
@@ -499,6 +501,9 @@ public class Toolkit {
 
     private VBox buildParametricSectionsPane() {
         VBox box = new VBox(8);
+        box.setMaxWidth(Double.MAX_VALUE);
+        box.setMinWidth(0);
+        box.setFillWidth(true);
         box.getChildren().add(description(
             "Forme parametriche: rettangolo, rettangolo cavo, cerchio pieno, tubo, profilo T, "
             + "profilo L equilatero (sezioni 2D → A, Ix, Iy, Wx, Wy, raggi giraz., perimetro, "
@@ -507,6 +512,7 @@ public class Toolkit {
 
         ComboBox<Sections.Shape> shape = new ComboBox<>(FXCollections.observableArrayList(Sections.Shape.values()));
         shape.setMaxWidth(Double.MAX_VALUE);
+        shape.setMinWidth(0);  // long item text "Piatto / Lamiera 3D (b × h × s)" otherwise forces ~270px min
         shape.setConverter(new StringConverter<>() {
             @Override public String toString(Sections.Shape s) {
                 if (s == null) return "";
@@ -698,6 +704,9 @@ public class Toolkit {
 
     private VBox buildCommercialProfilesPanel() {
         VBox v = new VBox(6);
+        v.setMaxWidth(Double.MAX_VALUE);
+        v.setMinWidth(0);
+        v.setFillWidth(true);
         v.getChildren().add(description(
             "Profili strutturali normalizzati IPE (a I), HEA / HEB (a H), UPN (a U) con "
             + "dimensioni h/b/tw/tf, area A, momenti d'inerzia Ix/Iy, moduli Wx/Wy e peso "
@@ -707,6 +716,7 @@ public class Toolkit {
 
         ComboBox<Catalog.ProfileSeries> seriesCombo = new ComboBox<>(FXCollections.observableArrayList(Catalog.PROFILE_SERIES));
         seriesCombo.setMaxWidth(Double.MAX_VALUE);
+        seriesCombo.setMinWidth(0);
         seriesCombo.setConverter(new StringConverter<>() {
             @Override public String toString(Catalog.ProfileSeries s) { return s == null ? "" : s.name(); }
             @Override public Catalog.ProfileSeries fromString(String s) { return null; }
@@ -714,6 +724,7 @@ public class Toolkit {
 
         ComboBox<Catalog.Profile> sizeCombo = new ComboBox<>();
         sizeCombo.setMaxWidth(Double.MAX_VALUE);
+        sizeCombo.setMinWidth(0);
         sizeCombo.setConverter(new StringConverter<>() {
             @Override public String toString(Catalog.Profile p) { return p == null ? "" : p.designation(); }
             @Override public Catalog.Profile fromString(String s) { return null; }
@@ -1623,7 +1634,9 @@ public class Toolkit {
         }
         dnCombo.getItems().addAll(dns);
         dnCombo.setMaxWidth(Double.MAX_VALUE);
+        dnCombo.setMinWidth(0);
         schCombo.setMaxWidth(Double.MAX_VALUE);
+        schCombo.setMinWidth(0);
 
         // Length input for total weight
         TextField lenField = numField();
