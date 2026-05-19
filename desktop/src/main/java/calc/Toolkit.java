@@ -525,6 +525,7 @@ public class Toolkit {
 
         GridPane inputs = new GridPane();
         inputs.setHgap(6); inputs.setVgap(4);
+        inputs.setMaxWidth(Double.MAX_VALUE);
         for (int c = 0; c < 4; c++) {
             ColumnConstraints cc = new ColumnConstraints();
             cc.setPercentWidth(25);
@@ -543,6 +544,7 @@ public class Toolkit {
 
         GridPane resultsGrid = new GridPane();
         resultsGrid.setHgap(6); resultsGrid.setVgap(4);
+        resultsGrid.setMaxWidth(Double.MAX_VALUE);
         resultsGrid.getStyleClass().add("toolkit-table");
         for (int c = 0; c < 3; c++) {
             ColumnConstraints cc = new ColumnConstraints();
@@ -1824,6 +1826,8 @@ public class Toolkit {
         Label l = new Label(s);
         l.getStyleClass().add("toolkit-hint");
         l.setWrapText(true);
+        l.setMaxWidth(Double.MAX_VALUE);
+        l.setMinWidth(0);
         return l;
     }
 
@@ -1832,6 +1836,7 @@ public class Toolkit {
         l.getStyleClass().add("tab-description");
         l.setWrapText(true);
         l.setMaxWidth(Double.MAX_VALUE);
+        l.setMinWidth(0);
         return l;
     }
 
