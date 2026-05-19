@@ -743,6 +743,25 @@
     -fx-border-width: 1;
     -fx-line-spacing: 2;
 }
+
+.toolkit-main-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #F5F6F8;
+}
+.toolkit-subtitle {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -accent;
+    -fx-letter-spacing: 0.5px;
+}
+.light .toolkit-main-title { -fx-text-fill: #0A0A0A; }
+.light .toolkit-subtitle   { -fx-text-fill: -accent; }
+
+.toolkit-back {
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+}
 .light .tab-description {
     -fx-text-fill: #3A3A3D;
     -fx-background-color: #F5F5F8;

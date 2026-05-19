@@ -49,51 +49,82 @@ public class Toolkit {
 
     private final Bridge bridge;
     private final Runnable closeAction;
-    private TabPane tabs;
+    private final Runnable backAction;
+    private final java.util.LinkedHashMap<String, Node> sectionPanes = new java.util.LinkedHashMap<>();
+    private Label subtitleLabel;
+    private VBox contentHolder;
 
-    public Toolkit(Bridge bridge, Runnable closeAction) {
+    public Toolkit(Bridge bridge, Runnable closeAction, Runnable backAction) {
         this.bridge = bridge;
         this.closeAction = closeAction;
+        this.backAction = backAction;
     }
 
-    /** Select a tab by its visible text (e.g. "Materiali", "Sezioni", "Wizards"). */
+    /** Backward-compat constructor (no back button). */
+    public Toolkit(Bridge bridge, Runnable closeAction) {
+        this(bridge, closeAction, null);
+    }
+
+    /** Show the section by visible name (e.g. "Materiali"). */
     public void selectTab(String name) {
-        if (tabs == null) return;
-        for (Tab t : tabs.getTabs()) {
-            if (name.equalsIgnoreCase(t.getText())) {
-                tabs.getSelectionModel().select(t);
-                return;
-            }
+        if (sectionPanes.isEmpty()) return;
+        // case-insensitive lookup
+        String resolved = null;
+        for (String key : sectionPanes.keySet()) {
+            if (key.equalsIgnoreCase(name)) { resolved = key; break; }
         }
+        if (resolved == null) resolved = sectionPanes.keySet().iterator().next();
+        Node pane = sectionPanes.get(resolved);
+        contentHolder.getChildren().setAll(pane);
+        VBox.setVgrow(pane, Priority.ALWAYS);
+        subtitleLabel.setText(resolved);
     }
 
     public Node buildPanel() {
-        HBox header = new HBox(8);
-        header.setAlignment(Pos.CENTER_LEFT);
+        // ---- Header: ← (back) + Title/Subtitle centered + ✕ (close) ----
+        Button back = new Button("←");
+        back.getStyleClass().addAll("chip", "icon", "toolkit-back");
+        back.setFocusTraversable(false);
+        back.setOnAction(e -> { if (backAction != null) backAction.run(); else closeAction.run(); });
+
         Label title = new Label("Strumenti meccanici");
-        title.getStyleClass().add("history-title");
-        Region sp = new Region();
-        HBox.setHgrow(sp, Priority.ALWAYS);
+        title.getStyleClass().add("toolkit-main-title");
+        title.setMaxWidth(Double.MAX_VALUE);
+        title.setAlignment(Pos.CENTER);
+
+        subtitleLabel = new Label("");
+        subtitleLabel.getStyleClass().add("toolkit-subtitle");
+        subtitleLabel.setMaxWidth(Double.MAX_VALUE);
+        subtitleLabel.setAlignment(Pos.CENTER);
+
+        VBox titleBox = new VBox(2, title, subtitleLabel);
+        titleBox.setAlignment(Pos.CENTER);
+        HBox.setHgrow(titleBox, Priority.ALWAYS);
+
         Button close = new Button("✕");
         close.getStyleClass().addAll("chip", "icon");
         close.setFocusTraversable(false);
         close.setOnAction(e -> closeAction.run());
-        header.getChildren().addAll(title, sp, close);
 
-        tabs = new TabPane();
-        tabs.getStyleClass().add("toolkit-tabs");
-        tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.getTabs().addAll(
-            buildUnitsTab(),
-            buildMaterialsTab(),
-            buildSectionsTab(),
-            buildFormulasTab(),
-            buildWizardsTab(),
-            buildStrumentiTab()
-        );
-        VBox.setVgrow(tabs, Priority.ALWAYS);
+        HBox header = new HBox(8, back, titleBox, close);
+        header.setAlignment(Pos.CENTER);
 
-        VBox panel = new VBox(10, header, tabs);
+        // ---- Section panes (built once, reused) ----
+        sectionPanes.put("Unità",     buildUnitsTab().getContent());
+        sectionPanes.put("Materiali", buildMaterialsTab().getContent());
+        sectionPanes.put("Sezioni",   buildSectionsTab().getContent());
+        sectionPanes.put("Formule",   buildFormulasTab().getContent());
+        sectionPanes.put("Procedure", buildWizardsTab().getContent());
+        sectionPanes.put("Strumenti", buildStrumentiTab().getContent());
+
+        contentHolder = new VBox();
+        contentHolder.setFillWidth(true);
+        VBox.setVgrow(contentHolder, Priority.ALWAYS);
+
+        // Default to first section
+        selectTab("Unità");
+
+        VBox panel = new VBox(10, header, contentHolder);
         panel.getStyleClass().add("history-panel");
         panel.setPadding(new Insets(14));
         return panel;

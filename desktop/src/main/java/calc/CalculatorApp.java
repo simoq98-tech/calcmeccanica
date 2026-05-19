@@ -172,7 +172,7 @@ public class CalculatorApp extends Application {
         historyPanel = buildHistoryPanel();
         historyPanel.setVisible(false);
 
-        toolkit = new Toolkit(buildBridge(), this::toggleToolkit);
+        toolkit = new Toolkit(buildBridge(), this::toggleToolkit, this::backFromToolkitToMenu);
         toolkitPanel = toolkit.buildPanel();
         toolkitPanel.setVisible(false);
 
@@ -1306,6 +1306,12 @@ public class CalculatorApp extends Application {
         hideAllOverlays();
         refreshModeRows();
         if (!wasVisible) modePanel.setVisible(true);
+    }
+
+    private void backFromToolkitToMenu() {
+        hideAllOverlays();
+        refreshModeRows();
+        modePanel.setVisible(true);
     }
 
     private void refreshModeRows() {
